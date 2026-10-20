@@ -1,0 +1,61 @@
+# Daily: build nixStatic from the latest stable nixpkgs, and if its version has no release yet, create a draft
+# release plus an issue assigned to the repo owner. Publish the draft to release.
+name: Release
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          stable=$(git ls-remote --heads https://github.com/NixOS/nixpkgs 'nixos-*' \
+            | grep -oE 'nixos-[0-9]{2}\.[0-9]{2}$' | sort -V | tail -1)
+          nix build "github:NixOS/nixpkgs/${stable:?}#nixStatic^out,man"
+      - id: package
+        run: |
+          version=$(result/bin/nix --version | awk '{ print $3 }')
+          rsync -a --copy-unsafe-links result/ result-resolved/
+          rsync -a --copy-unsafe-links result-man/ result-resolved/
+          mkdir dist
+          tar -czf "dist/nix-$version-$(uname -m)-linux.tar.gz" -C result-resolved .
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ runner.arch }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: |
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$VERSION already has a release"
+            exit 0
+          fi
+          gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+            --target "$GITHUB_SHA" --title "$VERSION" --notes ""
+          url=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json url -q .url)
+          gh issue create --repo "$GITHUB_REPOSITORY" --assignee "$GITHUB_REPOSITORY_OWNER" \
+            --title "Publish nix $VERSION" --body "Draft release is ready: $url"
