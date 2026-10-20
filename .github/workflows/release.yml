@@ -72,7 +72,7 @@ jobs:
           path: hash
           merge-multiple: true
       - run: |
-          hashes=$(cat hash/*)
+          hashes=$(echo "NAR hashes:"; cat hash/*)
           previous=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName')
           date=$(date -u +%Y%m%d)
           revision=1
