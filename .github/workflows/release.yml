@@ -28,7 +28,8 @@ jobs:
           rsync -a --copy-unsafe-links result/ result-resolved/
           rsync -a --copy-unsafe-links result-man/ result-resolved/
           mkdir dist
-          tar -czf "dist/nix-$version-$(uname -m)-linux.tar.gz" -C result-resolved .
+          chmod -R u+w,go+rX,go-w result-resolved
+          tar --owner=0 --group=0 --numeric-owner -czf "dist/nix-$version-$(uname -m)-linux.tar.gz" -C result-resolved .
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
