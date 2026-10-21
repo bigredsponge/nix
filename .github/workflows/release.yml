@@ -1,7 +1,7 @@
 # Daily: build nixStatic from the latest stable nixpkgs and compare it with the most recent release. A new version gets
-# a draft release tagged VERSION_YYYYMMDD.1; the same version gets VERSION_YYYYMMDD.N (N counts up within a day) if this
-# workflow or the NAR hash of the packaged files changed. Each release creates an issue assigned to the repo owner.
-# Publish the draft to release.
+# a draft release tagged VERSION_YYYYMMDD.1; the same version gets VERSION_YYYYMMDD.N (N counts up within a day) if the
+# NAR hash of the packaged files changed, or always when run manually. Each release creates an issue assigned to the repo
+# owner. Publish the draft to release.
 name: Release
 on:
   schedule:
@@ -58,9 +58,6 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       VERSION: ${{ needs.build.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           pattern: dist-*
@@ -77,9 +74,8 @@ jobs:
           date=$(date -u +%Y%m%d)
           revision=1
           if [ "${previous%_*}" = "$VERSION" ]; then
-            built_from=$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json targetCommitish -q .targetCommitish)
             previous_hashes=$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json body -q .body)
-            if git diff --quiet "$built_from" HEAD -- .github/workflows/release.yml && [ "$previous_hashes" = "$hashes" ]; then
+            if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$previous_hashes" = "$hashes" ]; then
               echo "$previous is up to date"
               exit 0
             fi
