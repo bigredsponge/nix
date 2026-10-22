@@ -74,7 +74,7 @@ jobs:
           date=$(date -u +%Y%m%d)
           revision=1
           if [ "${previous%_*}" = "$VERSION" ]; then
-            previous_hashes=$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json body -q .body)
+            previous_hashes=$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json body -q .body | tr -d '\r')
             if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$previous_hashes" = "$hashes" ]; then
               echo "$previous is up to date"
               exit 0
