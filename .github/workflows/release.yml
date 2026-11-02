@@ -1,5 +1,5 @@
 # Daily: build nixStatic from the latest stable nixpkgs and compare it with the most recent release. A new version gets
-# a draft release tagged VERSION_YYYYMMDD.1; the same version gets VERSION_YYYYMMDD.N (N counts up within a day) if the
+# a draft release tagged VERSION-YYYYMMDD.1; the same version gets VERSION-YYYYMMDD.N (N counts up within a day) if the
 # NAR hash of the packaged files changed, or always when run manually. Each release creates an issue assigned to the repo
 # owner. Publish the draft to release.
 name: Release
@@ -73,17 +73,17 @@ jobs:
           previous=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName')
           date=$(date -u +%Y%m%d)
           revision=1
-          if [ "${previous%_*}" = "$VERSION" ]; then
+          if [ "${previous%-*}" = "$VERSION" ]; then
             previous_hashes=$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json body -q .body | tr -d '\r')
             if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$previous_hashes" = "$hashes" ]; then
               echo "$previous is up to date"
               exit 0
             fi
-            if [ "${previous%.*}" = "${VERSION}_$date" ]; then
+            if [ "${previous%.*}" = "${VERSION}-$date" ]; then
               revision=$((${previous##*.} + 1))
             fi
           fi
-          tag=${VERSION}_$date.$revision
+          tag=${VERSION}-$date.$revision
           gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --draft \
             --target "$GITHUB_SHA" --title "$tag" --notes ""
           # Record the hashes only after every asset uploaded, so an incomplete draft never counts as up to date
